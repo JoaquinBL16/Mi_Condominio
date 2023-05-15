@@ -1,0 +1,51 @@
+{% extends 'layout.html' %}
+{% block body %}
+
+
+
+
+{% with messages = get_flashed_messages() %}
+{%if messages %}
+{%for message in messages%}
+
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        {{message}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+{%endfor%}
+{%endif%}
+{%endwith%}
+<form action="/add_reserva" method="POST">
+    <input type="text" name = "nombre" placeholder="Nombre Reserva">
+    <input type="text" name = "tipo" placeholder="Tipo Reserva">
+    <input type="date" name = "fecha" placeholder="fecha de la reserva">
+    <button type="submit">
+        Guardar
+    </button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <td>Nombre</td>
+            <td>Tipo</td>
+            <td>fecha</td>
+            <td>operaciones</td>
+        </tr>
+    </thead>
+    <tbody>
+      {%for reserva in reservas %}  
+      <tr>
+        <td>{{reserva.1}}</td>
+        <td>{{reserva.2}}</td>
+        <td>{{reserva.3}}</td>
+        <td>
+            <a href="/edit/{{reserva.0}}">Editar</a>
+            <a href="/delete/{{reserva.0}}">Eliminar</a>
+        </td>
+      </tr>
+      {%endfor%}
+    </tbody>
+</table>
+
+{% endblock %}
