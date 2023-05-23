@@ -1,0 +1,10 @@
+<form action="/reserva" method="POST">
+    <input type="text" name="nombre" placeholder="Nombre">
+    <input type="date" name="fecha" placeholder="Fecha">
+    <!-- ... otros campos del formulario -->
+    <button type="submit">Reservar</button>
+</form>
+
+{% if error %}
+    <p style="color: red;">{{ error }}</p>
+{% endif %}

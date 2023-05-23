@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="col-md-7">
+        <table class="table table-striped table-bordered bg-white table-sm ">
+            <thead>
+                <tr>
+                    <td>Nombre</td>
+                    <td>Tipo</td>
+                    <td>fecha</td>
+                    <td>operaciones</td>
+                </tr>
+            </thead>
+            <tbody>
+              {%for reserva in reservas %}  
+              <tr>
+                <td>{{reserva.1}}</td>
+                <td>{{reserva.2}}</td>
+                <td>{{reserva.3}}</td>
+                <td>
+                    <a href="/reservas" class="btn btn-secondary">Editar</a>
+                    <a href="/mover-datos/{{reserva.0}}" class="btn btn-danger">Anular</a>
+                </td>
+              </tr>
+              {%endfor%}
+            </tbody>
+        </table>
+    </div>
+    {% endblock %}
