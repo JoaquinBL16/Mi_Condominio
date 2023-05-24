@@ -7,7 +7,8 @@
                     <td>Nombre</td>
                     <td>Tipo</td>
                     <td>fecha</td>
-                    <td>operaciones</td>
+                    <!---  <td>operaciones</td> ---->
+
                 </tr>
             </thead>
             <tbody>
@@ -16,10 +17,9 @@
                 <td>{{reserva.1}}</td>
                 <td>{{reserva.2}}</td>
                 <td>{{reserva.3}}</td>
-                <td>
-                    <a href="/reservas" class="btn btn-secondary">Editar</a>
-                    <a href="/mover-datos/{{reserva.0}}" class="btn btn-danger">Anular</a>
-                </td>
+                <!-----<td>
+                  <a href="/mover-datos/{{reserva.0}}" class="btn btn-danger">Anular</a>
+              </td>---> 
               </tr>
               {%endfor%}
             </tbody>

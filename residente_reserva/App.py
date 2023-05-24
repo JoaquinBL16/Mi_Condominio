@@ -2,6 +2,7 @@ from flask import Flask, render_template,request,redirect,url_for,flash,jsonify
 from flask_mysqldb import MySQL
 
 
+
 app = Flask (__name__)
 
 
@@ -28,39 +29,40 @@ mysql = MySQL(app)
 #settings
 app.secret_key = 'mysecretkey'
 
-@app.route('/reservas', methods=['POST'])
-def reserva_cliente():
-    # Obtener los datos del formulario
-    nombre = request.form['nombre']
-    tipo = request.form['tipo']
-    fecha = request.form['fecha']
-    # ... otros campos del formulario
 
-    # Crear un cursor para interactuar con la base de datos
-    cur = mysql.connection.cursor()
-
-    # Verificar si la fecha ya está reservada
-    query = "SELECT COUNT(*) FROM reservas WHERE fecha_reserva = %s"
-    cur.execute(query, (fecha,))
-    count = cur.fetchone()[0]
-
-    if count > 0:
-        # Si la fecha ya está reservada, mostrar un mensaje de error
-        mensaje_error = "La fecha seleccionada ya está reservada. Por favor, elige otra fecha."
-        return render_template('formulario.html', error=mensaje_error)
-
-    # Insertar los datos en la tabla de reservas
-    query = "INSERT INTO reservas (nombre_reserva,tipo_reserva, fecha_reserva) VALUES (%s, %s)"
-    values = (nombre,tipo, fecha)
-    cur.execute(query, values)
-
-    # Hacer commit para guardar los cambios en la base de datos
-    mysql.connection.commit()
-    # Cerrar el cursor
-    cur.close()
-
-    # Redirigir a una página de confirmación de reserva
-    return render_template('confirmacion.html')
+#@app.route('/reservas', methods=['POST'])
+#def reserva_cliente():
+#    # Obtener los datos del formulario
+#    nombre = request.form['nombre']
+#    tipo = request.form['tipo']
+#    fecha = request.form['fecha']
+#    # ... otros campos del formulario
+#
+#    # Crear un cursor para interactuar con la base de datos
+#    cur = mysql.connection.cursor()
+#
+#    # Verificar si la fecha ya está reservada
+#    query = "SELECT COUNT(*) FROM reservas WHERE fecha_reserva = %s"
+#    cur.execute(query, (fecha,))
+#    count = cur.fetchone()[0]
+#
+#    if count > 0:
+#        # Si la fecha ya está reservada, mostrar un mensaje de error
+#        mensaje_error = "La fecha seleccionada ya está reservada. Por favor, elige otra fecha."
+#        return render_template('formulario.html', error=mensaje_error)
+#
+#    # Insertar los datos en la tabla de reservas
+#    query = "INSERT INTO reservas (nombre_reserva,tipo_reserva, fecha_reserva) VALUES (%s, %s)"
+#    values = (nombre,tipo, fecha)
+#    cur.execute(query, values)
+#
+#    # Hacer commit para guardar los cambios en la base de datos
+#    mysql.connection.commit()
+#    # Cerrar el cursor
+#    cur.close()
+#
+#    # Redirigir a una página de confirmación de reserva
+#    return render_template('confirmacion.html')
 
 
 #obteniendo el get 
