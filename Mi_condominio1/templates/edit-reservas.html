@@ -1,0 +1,12 @@
+
+{% extends 'layout.html' %}
+{% block body %}
+<form action="/update/{{ reserva['id_reservas'] }}" method="POST">
+    <input type="text" name = "nombre" placeholder="Nombre Reserva" value="{{ reserva['nombre_reserva'] }}">
+    <input type="text" name = "tipo" placeholder="Tipo Reserva" value="{{ reserva['tipo_reserva'] }}">
+    <input type="date" name = "fecha" placeholder="fecha de la reserva" value="{{ reserva['fecha_reserva'] }}">
+    <button type="submit">
+        Guardar
+    </button>
+</form>
+{% endblock %}

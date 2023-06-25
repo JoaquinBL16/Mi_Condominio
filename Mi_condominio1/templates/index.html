@@ -1,0 +1,61 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="row">
+    <div class="col-md-5">
+        {% with messages = get_flashed_messages() %}
+        {%if messages %}
+        {%for message in messages%}
+
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{message}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+        {%endfor%}
+        {%endif%}
+        {%endwith%}
+        <style>
+            body, html {
+                height: 100%;
+                margin: 0;
+            }
+        
+            .container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100%;
+            }
+        
+            .card {
+                width: 500px;
+                height: 300px;
+            }
+        </style>
+        <div class="card card-body">
+            <form action="/add_reserva" method="POST">
+                <div class="form-group">
+                <h1 class="mb-4">Reserva Residente</h1>
+                    <input type="text" name = "nombre" placeholder="Nombre Reserva" class="form-control">
+                </div>
+                <div class="form-group">
+                    <select class="form-select"name ="tipo" aria-label="Default select example">
+                        <option selected>tipo de Reserva</option>
+                        <option value="piscina">piscina</option>
+                        <option value="Quincho">Quincho</option>
+                        <option value="Sala de eventos">Sala de eventos</option>
+                      </select>
+                </div>
+                <div class="form-group">
+                    <input type="date" name = "fecha" placeholder="fecha de la reserva" class="form-control">
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-block">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

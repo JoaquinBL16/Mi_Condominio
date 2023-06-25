@@ -1,12 +1,22 @@
-from flask import Flask, render_template,request,redirect,url_for,flash,jsonify
+from flask import Flask, render_template,request,redirect,url_for,flash,jsonify,session
 from flask_mysqldb import MySQL
-
-
+from flask_session import Session
+from flask_cors import CORS
+import requests
+import json
+import paypalrestsdk
 
 app = Flask (__name__)
 
 
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
 
+
+paypalrestsdk.configure({
+  "mode": "sandbox", # sandbox or live
+  "client_id": "AUpn-5NF8EYtrDCngmhuj_BoIvrBmGwdwY1WNeVg4y7SZz3UAAeTmLapWIbtsMFgt1bZesWbjD_4PkCV",
+  "client_secret": "EH043BMufzQUmfgIoRgSvqqNjL4N9o-WqqEFlDPaVhKqbaqYv3QFr537TPR4fbIDJIGL8bnewo6BICES" })
 
 #conexion a MYSQl
 app.config['MYSQL_HOST'] = 'localhost'
@@ -15,55 +25,260 @@ app.config['MYSQL_PASSWORD'] = 'admin'
 app.config['MYSQL_DB'] = 'micondominio'
 mysql = MySQL(app)
 
-#class Reserva(mysql.Model):
-#    id_reservas = mysql.column(mysql.Integer,Primary_key=True)
-#    nombre_reserva = mysql.column(mysql.String(255))
-#    tipo_reserva = mysql.column(mysql.String(255))
-#    fecha_reserva = mysql.column(mysql.Date)
-#
-#    def __init_(self,nombre_reserva,tipo_reserva,fecha_reserva):
 
-
-    
 
 #settings
 app.secret_key = 'mysecretkey'
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        # Obtener los datos del formulario
+        nombre_reserva = request.form['nombre_reserva']
+        
+        # Verificar si el usuario es administrador
+        if nombre_reserva == 'administrador':
+            # Almacenar los datos de administrador en la sesión
+            session['nombre_reserva'] = nombre_reserva
+            session['es_administrador'] = True
+            
+            # Redirigir a la página de reservas para administrador
+            return redirect(url_for('obtener_reservas'))
+        
+        # Verificar si el nombre de reserva existe en la base de datos
+        cursor = mysql.connection.cursor()
+        consulta = "SELECT COUNT(*) FROM reservas WHERE nombre_reserva = %s"
+        cursor.execute(consulta, (nombre_reserva,))
+        count = cursor.fetchone()[0]
+        
+        if count > 0:
+            # Almacenar los datos de reserva en la sesión
+            session['nombre_reserva'] = nombre_reserva
+            session['es_administrador'] = False
+            
+            # Redirigir a la página de reservas para usuarios normales
+            return redirect(url_for('obtener_reservas'))
+        
+        # Si no se cumple ninguna condición, mostrar mensaje de error
+        error_message = "Nombre de reserva no válido. Por favor, intente nuevamente."
+        return render_template('login.html', error_message=error_message)
+    
+    # Si es una solicitud GET, mostrar el formulario de inicio de sesión
+    return render_template('login.html')
 
-#@app.route('/reservas', methods=['POST'])
-#def reserva_cliente():
-#    # Obtener los datos del formulario
-#    nombre = request.form['nombre']
-#    tipo = request.form['tipo']
-#    fecha = request.form['fecha']
-#    # ... otros campos del formulario
-#
-#    # Crear un cursor para interactuar con la base de datos
-#    cur = mysql.connection.cursor()
-#
-#    # Verificar si la fecha ya está reservada
-#    query = "SELECT COUNT(*) FROM reservas WHERE fecha_reserva = %s"
-#    cur.execute(query, (fecha,))
-#    count = cur.fetchone()[0]
-#
-#    if count > 0:
-#        # Si la fecha ya está reservada, mostrar un mensaje de error
-#        mensaje_error = "La fecha seleccionada ya está reservada. Por favor, elige otra fecha."
-#        return render_template('formulario.html', error=mensaje_error)
-#
-#    # Insertar los datos en la tabla de reservas
-#    query = "INSERT INTO reservas (nombre_reserva,tipo_reserva, fecha_reserva) VALUES (%s, %s)"
-#    values = (nombre,tipo, fecha)
-#    cur.execute(query, values)
-#
-#    # Hacer commit para guardar los cambios en la base de datos
-#    mysql.connection.commit()
-#    # Cerrar el cursor
-#    cur.close()
-#
-#    # Redirigir a una página de confirmación de reserva
-#    return render_template('confirmacion.html')
 
+@app.route('/logout')
+def logout():
+    # Eliminar el nombre de reserva de la sesión al cerrar sesión
+    session.pop('nombre_reserva', None)
+    return redirect(url_for('login'))
+
+    
+@app.route('/reservass', methods=['GET'])
+def obtener_reservas():
+    if 'nombre_reserva' in session:
+        nombre_reserva = session['nombre_reserva']
+        
+        if session['es_administrador']:
+            consulta = "SELECT * FROM reservas"
+            cursor = mysql.connection.cursor()
+            cursor.execute(consulta)
+            resultados = cursor.fetchall()
+            cursor.close()
+            
+            reservas = []
+            total = 0
+            for fila in resultados:
+                reserva = {
+                    'id_reserva': fila[0],
+                    'nombre_reserva': fila[1],
+                    'tipo_reserva': fila[2],
+                    'fecha_reserva': fila[3],
+                    'precio_reserva': fila[4]
+                }
+                reservas.append(reserva)
+                total += fila[4]
+            
+            precios = {
+                'Quincho': 100000,
+                'Sala de eventos': 200000,
+                'piscina': 50000
+            }
+            
+            for reserva in reservas:
+                tipo_reserva = reserva['tipo_reserva']
+                if tipo_reserva in precios:
+                    reserva['precio_reserva'] = precios[tipo_reserva]
+            
+            return render_template('admin_reservas.html', reservas=reservas, total=total)
+        else:
+            consulta = "SELECT * FROM reservas WHERE nombre_reserva = %s"
+            cursor = mysql.connection.cursor()
+            cursor.execute(consulta, (nombre_reserva,))
+            resultados = cursor.fetchall()
+            cursor.close()
+            
+            reservas = []
+            total = 0
+            for fila in resultados:
+                reserva = {
+                    'id_reserva': fila[0],
+                    'nombre_reserva': fila[1],
+                    'tipo_reserva': fila[2],
+                    'fecha_reserva': fila[3],
+                    'precio_reserva': fila[4]
+                }
+                reservas.append(reserva)
+                total += fila[4]
+            
+            precios = {
+                'Quincho': 100000,
+                'Sala de eventos': 200000,
+                'piscina': 50000
+            }
+        # Calcula el total
+        # Actualiza los precios de las reservas en base al diccionario de precios
+        for reserva in reservas:
+            tipo_reserva = reserva['tipo_reserva']
+            if tipo_reserva in precios:
+                reserva['precio_reserva'] = precios[tipo_reserva]
+        total = sum(reserva['precio_reserva'] for reserva in reservas)
+        # Cierra el cursor
+        cursor.close()
+        # Renderiza la plantilla HTML 'consulta.html' con los datos de las reservas y el total
+        return render_template('consulta.html', reservas=reservas, total=total)
+        #return jsonify({'reservas':reservas, 'total':total})
+    return redirect(url_for('login'))
+
+#@app.route('/reservass', methods=['GET'])
+#def obtener_reservas():
+#    # Verificar si el usuario ha iniciado sesión como residente
+#    if 'nombre_reserva' in session and session['nombre_reserva']:
+#        nombre_reserva = session['nombre_reserva']
+#        
+#        # Prepara la consulta SQL
+#        consulta = "SELECT * FROM reservas WHERE nombre_reserva = %s"
+#        
+#        # Ejecuta la consulta con el nombre de la persona como parámetro
+#        cursor = mysql.connection.cursor()
+#        cursor.execute(consulta, (nombre_reserva,))
+#        
+#        # Obtiene todas las filas resultantes de la consulta
+#        # Obtiene todas las filas resultantes de la consulta
+#        resultados = cursor.fetchall()
+#    
+#        # Transforma los resultados en una lista de diccionarios
+#        reservas = []
+#        total = 0
+#        for fila in resultados:
+#            reserva = {
+#                'id_reserva': fila[0],
+#                'nombre_reserva': fila[1],
+#                'tipo_reserva': fila[2],
+#                'fecha_reserva': fila[3],
+#                'precio_reserva': fila[4]
+#            }
+#            reservas.append(reserva)
+#            total += fila[4]
+#    
+#        # Crea un diccionario con los precios para cada tipo de reserva
+#        precios = {
+#            'Quincho': 100000,
+#            'Sala de eventos': 200000,
+#            'piscina': 50000
+#        }
+#        # Calcula el total
+#        
+#        # Actualiza los precios de las reservas en base al diccionario de precios
+#        for reserva in reservas:
+#            tipo_reserva = reserva['tipo_reserva']
+#            if tipo_reserva in precios:
+#                reserva['precio_reserva'] = precios[tipo_reserva]
+#        total = sum(reserva['precio_reserva'] for reserva in reservas)
+#        # Cierra el cursor
+#        cursor.close()
+#    
+#        # Renderiza la plantilla HTML 'consulta.html' con los datos de las reservas y el total
+#        return render_template('consulta.html', reservas=reservas, total=total)
+#        #return jsonify({'reservas':reservas, 'total':total})
+#    
+#    else:
+#        # El usuario no ha iniciado sesión, redirigir al formulario de inicio de sesión
+#        return redirect(url_for('login'))
+
+
+@app.route('/payment', methods=['POST'])
+def payment():
+    reservas = [
+        {
+            "fecha_reserva": "Fri, 26 May 2023 00:00:00 GMT",
+            "id_reserva": 2667,
+            "nombre_reserva": "felipe",
+            "precio_reserva": 50,
+            "tipo_reserva": "piscina"
+        },
+        {
+            "fecha_reserva": "Fri, 02 Jun 2023 00:00:00 GMT",
+            "id_reserva": 2668,
+            "nombre_reserva": "felipe",
+            "precio_reserva": 100,
+            "tipo_reserva": "Quincho"
+        },
+        {
+            "fecha_reserva": "Sat, 01 Jul 2023 00:00:00 GMT",
+            "id_reserva": 2696,
+            "nombre_reserva": "felipe",
+            "precio_reserva": 50,
+            "tipo_reserva": "piscina"
+        }
+    ]
+
+    total = sum(reserva["precio_reserva"] for reserva in reservas)
+
+    payment = paypalrestsdk.Payment({
+        "intent": "sale",
+        "payer": {
+            "payment_method": "paypal"
+        },
+        "redirect_urls": {
+            "return_url": "http://localhost:3001/payment/execute",
+            "cancel_url": "http://localhost:3001/"
+        },
+        "transactions": [{
+            "item_list": {
+                "items": [{
+                    "name": "Total De Reserva",
+                    "sku": "12345",
+                    "price": str(total),
+                    "currency": "USD",
+                    "quantity": 1
+                }]
+            },
+            "amount": {
+                "total": str(total),
+                "currency": "USD"
+            },
+            "description": "This is the payment transaction description."
+        }]
+    })
+
+    if payment.create():
+        print('Payment success!')
+    else:
+        print(payment.error)
+
+    return jsonify({'paymentID': payment.id})
+
+@app.route('/execute', methods=['POST'])
+def execute():
+    success = False
+
+    payment = paypalrestsdk.Payment.find(request.form['paymentID'])
+
+    if payment.execute({'payer_id': request.form['payerID']}):
+        success = True
+
+    return jsonify({'success' : success})
 
 #obteniendo el get 
 @app.route('/reservas',methods=['GET'])
@@ -81,6 +296,7 @@ def obtener_datos():
         return render_template('consulta.html',reservas =datos)
     except Exception as ex:
         return jsonify({'mensaje':"Error"})
+
     
 @app.route('/reservas/<id>',methods=['GET'])
 def leer_reserva(id):
@@ -95,8 +311,23 @@ def leer_reserva(id):
         else:
             return jsonify({'mensaje':"Reserva no encontrada"})
     except Exception as ex:
+
         return jsonify({'mensaje':"Error"})
-    
+@app.route('/reservas/<nombre>')
+def mostrar_reservas(nombre):
+    # Crear un cursor para interactuar con la base de datos
+    cur = mysql.connection.cursor()
+
+    # Obtener las reservas del residente específico
+    query = "SELECT * FROM reservas WHERE nombre_reserva = %s"
+    cur.execute(query, (nombre,))
+    data = cur.fetchall()
+
+    # Cerrar el cursor
+    cur.close()
+
+    # Pasar los datos de las reservas a la plantilla para mostrarlos
+    return render_template('consulta.html', reservas=data)    
 
 @app.route('/reservas',methods=['POST'])   
 def registrar_reserva():
@@ -124,55 +355,61 @@ def eliminar_reserva(id):
     except Exception as ex:
             return jsonify({'mensaje':"Error"})
 
-#api datos 
-#@app.route('/api/datos')
-#def obtener_datos():
-#    print('Se ha llamado a la función obtener_datos()')  # Mensaje de prueba
-#    cur = mysql.connection.cursor()
-#    cur.execute("SELECT * FROM reservas")
-#    datos2 = cur.fetchall()
-#    resultados = []
-#    for fila in datos2:
-#        resultado = {
-#            'nombre_reserva': fila[0],
-#            'tipo_reserva': fila[1],
-#            'fecha_reserva': fila[2]
-#        }
-#        resultados.append(resultado)
-#    cur.close()
-#    mysql.connection.close()
-#    return jsonify(resultados)
-
-
 @app.route('/')
 def Index():
     cur = mysql.connection.cursor()
     cur.execute('SELECT * FROM reservas')
     data = cur.fetchall()
+    return render_template('login.html', reservas =data)
+
+@app.route('/generar_reserva')
+def generar_reserva():
+    cur = mysql.connection.cursor()
+    cur.execute('SELECT * FROM reservas')
+    data = cur.fetchall()
     return render_template('index.html', reservas =data)
 
-@app.route('/add_reserva', methods= ['POST'])
+@app.route('/add_reserva', methods=['POST'])
 def add_contact():
     if request.method == 'POST':
-        nombre = request.form ['nombre']
-        tipo = request.form ['tipo']
-        fecha = request.form ['fecha']
+        nombre = request.form['nombre']
+        tipo = request.form['tipo']
+        fecha = request.form['fecha']
+        
+        # Obtén el precio correspondiente al tipo de reserva desde el diccionario de precios
+        precios = {
+            'Quincho': 100000,
+            'Sala de eventos': 200000,
+            'piscina': 50000
+        }
+        
+        if tipo in precios:
+            precio = precios[tipo]
+        else:
+            # Si el tipo de reserva no está en el diccionario de precios, muestra un mensaje de error
+            mensaje_error = "Tipo de reserva inválido"
+            return render_template('index.html', error=mensaje_error)
+        
         cur = mysql.connection.cursor()
+        
+        # Verifica si la fecha ya está reservada
         query = "SELECT COUNT(*) FROM reservas WHERE fecha_reserva = %s"
         cur.execute(query, (fecha,))
         count = cur.fetchone()[0]
 
         if count > 0:
-        # Si la fecha ya está reservada, mostrar un mensaje de error
+            # Si la fecha ya está reservada, mostrar un mensaje de error
             mensaje_error = "La fecha seleccionada ya está reservada. Por favor, elige otra fecha."
             return render_template('index.html', error=mensaje_error)
 
-    # Insertar los datos en la tabla de reservas
-        cur.execute('INSERT INTO reservas (nombre_reserva, tipo_reserva, fecha_reserva) VALUES(%s, %s, %s)',
-                    (nombre,tipo,fecha))
+        # Insertar los datos en la tabla de reservas con el precio correspondiente
+        cur.execute('INSERT INTO reservas (nombre_reserva, tipo_reserva, fecha_reserva, precio_reserva) VALUES(%s, %s, %s, %s)',
+                    (nombre, tipo, fecha, precio))
         mysql.connection.commit()
-        flash('SE HIZO LA RESERVA EXITOSAMENTE ')
-        return redirect( url_for('Index'))   
+        cur.close()
+        
+        flash('SE HIZO LA RESERVA EXITOSAMENTE')
+        return redirect(url_for('generar_reserva'))
 
 @app.route('/edit/<id>')
 def get_reserva (id):
@@ -226,62 +463,7 @@ def mover_datos(id):
     mysql.connection.commit()
     mysql.connection.close()
 
-    return redirect(url_for('Index'))
-
-#@app.route('/mover-datos/<id>', methods=['POST'])
-#def mover_datos():
-#    cur = mysql.connection.cursor()
-#    # Obtén los datos que deseas mover de la tabla original
-#    cur.execute("SELECT * FROM reservas WHERE id_reservas = %s", [request.form.get('id_reservas')])
-#    datos = cur.fetchall()
-#
-#    # Inserta los datos recuperados en la nueva tabla
-#    for fila in datos:
-#        cur.execute("INSERT INTO reservas_nulas (nombre_nula, tipo_nula, fecha_nula) VALUES (%s, %s, %s)", [fila[0], fila[1], fila[2]])
-#
-#    # Guarda los cambios en la base de datos
-#    mysql.connection.commit()
-#
-#    # Devuelve una respuesta exitosa al cliente
-#    return 'Datos movidos exitosamente'
-
-
-
-
-#@app.route('/mover-datos/<string:id>')
-#def mover_datos():
-#    try:
-#        # Crea un cursor para ejecutar las consultas
-#        cur = mysql.connection.cursor()
-#
-#        # Ejecuta una consulta SELECT para obtener los datos que deseas modificar
-#        select_query = "SELECT * FROM reservas WHERE id_reservas= {0}".format(id)
-#        cur.execute(select_query)
-#        datos_originales = cur.fetchall()
-#
-#        # Itera sobre los datos obtenidos y ejecuta las operaciones de inserción y eliminación en las tablas
-#        for dato_original in datos_originales:
-#            # Ejecuta una consulta INSERT para insertar los datos en la tabla de destino
-#            insert_query = "INSERT INTO reservas_nulas (nombre_nula, tipo_nula, fecha_nula) VALUES (%s, %s, %s)"
-#            cur.execute(insert_query, dato_original)
-#
-#            # Ejecuta una consulta DELETE o UPDATE para eliminar o marcar los registros que se hayan movido en la tabla original
-#            delete_query = "DELETE FROM reservas WHERE id_reservas = %s"
-#            cur.execute(delete_query, (dato_original[0],))  # asumiendo que el ID está en la primera columna
-#
-#        # Confirma los cambios realizados en la base de datos
-#            mysql.connection.commit()
-#
-#        return 'Datos movidos correctamente'
-#    except mysql.connector.Error as error:
-#        # Maneja los errores de la base de datos
-#        print('Error al mover los datos:', error)
-#        return 'Error al mover los datos'
-#    finally:
-#        # Cierra la conexión a la base de datos
-#        cur.close()
-#        mysql.connection.close()
-
+    return redirect(url_for('generar_reserva'))
 
 if __name__ == '__main__':
-    app.run(port=3000, debug= True )
+    app.run(port=3001, debug= True )

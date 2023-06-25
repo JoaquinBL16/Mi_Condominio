@@ -1,28 +1,86 @@
 {% extends 'layout.html' %}
-{% block body %}
-<div class="col-md-7">
-        <table class="table table-striped table-bordered bg-white table-sm ">
-            <thead>
-                <tr>
-                    <td>Nombre</td>
-                    <td>Tipo</td>
-                    <td>fecha</td>
-                    <!---  <td>operaciones</td> ---->
 
-                </tr>
-            </thead>
-            <tbody>
-              {%for reserva in reservas %}  
-              <tr>
-                <td>{{reserva.1}}</td>
-                <td>{{reserva.2}}</td>
-                <td>{{reserva.3}}</td>
-                <!-----<td>
-                  <a href="/mover-datos/{{reserva.0}}" class="btn btn-danger">Anular</a>
-              </td>---> 
-              </tr>
-              {%endfor%}
-            </tbody>
-        </table>
+{% block body %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card bg-white">
+                <div class="card-body">
+                    <h1 class="card-title">Reservas</h1>
+                    {% if reservas %}
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo</th>
+                                <th>Fecha</th>
+                                <th>Precio</th>
+                                <th>Operaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reserva in reservas %}
+                            <tr>
+                                <td>{{ reserva['nombre_reserva'] }}</td>
+                                <td>{{ reserva['tipo_reserva'] }}</td>
+                                <td>{{ reserva['fecha_reserva'] }}</td>
+                                <td>{{ reserva['precio_reserva'] }}</td>
+                                <td>
+                                    <a href="/mover-datos/{{ reserva['id_reserva'] }}" class="btn btn-danger">Anular</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr>
+                                <td colspan="3"></td>
+                                <td class="font-weight-bold">Total:</td>
+                                <td class="font-weight-bold">{{ total }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p>No hay reservas disponibles.</p>
+                    {% endif %}
+                    <div id="paypal-button"></div>
+                    <div id="mensaje-pago" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
     </div>
-    {% endblock %}
+</div>
+
+<script src="https://www.paypalobjects.com/api/checkout.js"></script>
+<script>
+    var CREATE_PAYMENT_URL  = 'http://127.0.0.1:3001/payment';
+    var EXECUTE_PAYMENT_URL = 'http://127.0.0.1:3001/execute';
+
+    paypal.Button.render({
+
+        env: 'sandbox', // Or 'sandbox'
+
+        commit: true, // Show a 'Pay Now' button
+
+        payment: function() {
+            return paypal.request.post(CREATE_PAYMENT_URL).then(function(data) {
+                return data.paymentID;
+            });
+        },
+
+        onAuthorize: function(data) {
+            return paypal.request.post(EXECUTE_PAYMENT_URL, {
+                paymentID: data.paymentID,
+                payerID:   data.payerID
+            }).then(function(res) {
+                console.log(res.success);
+                if (res.success) {
+                    document.getElementById('mensaje-pago').textContent = '¡Pago exitoso!';
+                    document.getElementById('mensaje-pago').style.display = 'block';
+                } else {
+                    document.getElementById('mensaje-pago').textContent = 'Error en el pago';
+                    document.getElementById('mensaje-pago').style.display = 'block';
+                }
+            });
+        }
+
+    }, '#paypal-button');
+</script>
+{% endblock %}
